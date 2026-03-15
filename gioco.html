@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gioco del Tris</title>
+    <!-- Utilizziamo Tailwind CSS per uno stile moderno e responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Animazioni personalizzate per rendere il gioco più fluido */
+        .cell-transition {
+            transition: background-color 0.3s ease, transform 0.1s ease;
+        }
+        .cell-transition:active {
+            transform: scale(0.95);
+        }
+        .pop-in {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center font-sans text-white p-4">
+
+    <!-- Contenitore principale dell'applicazione -->
+    <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-gray-700">
+        
+        <!-- Intestazione -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500 mb-2">
+                Tris
+            </h1>
+            <p id="statusDisplay" class="text-xl font-medium text-gray-300 h-8">
+                Tocca al giocatore <span class="text-blue-400 font-bold">X</span>
+            </p>
+        </div>
+
+        <!-- Griglia di gioco 3x3 -->
+        <div class="grid grid-cols-3 gap-3 mb-8">
+            <button data-cell-index="0" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="1" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="2" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="3" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="4" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="5" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="6" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="7" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+            <button data-cell-index="8" class="cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"></button>
+        </div>
+
+        <!-- Pulsante di reset -->
+        <button id="restartBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors duration-200 shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500">
+            Ricomincia Partita
+        </button>
+    </div>
+
+    <!-- Logica JavaScript dell'applicazione -->
+    <script>
+        // Variabili di stato del gioco
+        let board = ["", "", "", "", "", "", "", "", ""];
+        let currentPlayer = "X";
+        let gameActive = true;
+
+        // Elementi del DOM
+        const statusDisplay = document.getElementById('statusDisplay');
+        const cells = document.querySelectorAll('.cell');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Condizioni di vittoria (indici della griglia)
+        const winningConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Righe
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Colonne
+            [0, 4, 8], [2, 4, 6]             // Diagonali
+        ];
+
+        // Messaggi di stato
+        const winningMessage = () => `Ha vinto <span class="${currentPlayer === 'X' ? 'text-blue-400' : 'text-rose-400'} font-bold">${currentPlayer}</span>! 🎉`;
+        const drawMessage = () => `<span class="text-yellow-400 font-bold">Pareggio!</span> 😲`;
+        const currentPlayerTurn = () => `Tocca al giocatore <span class="${currentPlayer === 'X' ? 'text-blue-400' : 'text-rose-400'} font-bold">${currentPlayer}</span>`;
+
+        // Gestisce il click su una cella
+        function handleCellClick(clickedCellEvent) {
+            const clickedCell = clickedCellEvent.target;
+            const clickedCellIndex = parseInt(clickedCell.getAttribute('data-cell-index'));
+
+            // Ignora il click se la cella è già piena o il gioco è finito
+            if (board[clickedCellIndex] !== "" || !gameActive) {
+                return;
+            }
+
+            handleCellPlayed(clickedCell, clickedCellIndex);
+            handleResultValidation();
+        }
+
+        // Aggiorna la griglia e l'interfaccia visiva
+        function handleCellPlayed(clickedCell, clickedCellIndex) {
+            board[clickedCellIndex] = currentPlayer;
+            clickedCell.innerHTML = `<span class="pop-in inline-block ${currentPlayer === 'X' ? 'text-blue-400' : 'text-rose-400'}">${currentPlayer}</span>`;
+            clickedCell.classList.remove('cursor-pointer', 'hover:bg-gray-600');
+        }
+
+        // Controlla se c'è un vincitore o un pareggio
+        function handleResultValidation() {
+            let roundWon = false;
+            let winningCells = [];
+
+            for (let i = 0; i <= 7; i++) {
+                const winCondition = winningConditions[i];
+                let a = board[winCondition[0]];
+                let b = board[winCondition[1]];
+                let c = board[winCondition[2]];
+
+                if (a === '' || b === '' || c === '') {
+                    continue;
+                }
+                if (a === b && b === c) {
+                    roundWon = true;
+                    winningCells = winCondition;
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                statusDisplay.innerHTML = winningMessage();
+                gameActive = false;
+                
+                // Evidenzia le celle vincenti
+                winningCells.forEach(index => {
+                    cells[index].classList.add('bg-gray-600', 'ring-2', 'ring-green-400');
+                });
+                return;
+            }
+
+            // Controlla il pareggio
+            let roundDraw = !board.includes("");
+            if (roundDraw) {
+                statusDisplay.innerHTML = drawMessage();
+                gameActive = false;
+                return;
+            }
+
+            // Cambia turno se il gioco continua
+            handlePlayerChange();
+        }
+
+        // Cambia il giocatore attivo
+        function handlePlayerChange() {
+            currentPlayer = currentPlayer === "X" ? "O" : "X";
+            statusDisplay.innerHTML = currentPlayerTurn();
+        }
+
+        // Resetta lo stato del gioco
+        function handleRestartGame() {
+            gameActive = true;
+            currentPlayer = "X";
+            board = ["", "", "", "", "", "", "", "", ""];
+            statusDisplay.innerHTML = currentPlayerTurn();
+            
+            cells.forEach(cell => {
+                cell.innerHTML = "";
+                cell.className = "cell cell-transition h-24 bg-gray-700 rounded-xl text-5xl font-bold flex items-center justify-center cursor-pointer hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500";
+            });
+        }
+
+        // Aggiunta degli Event Listener
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+        restartBtn.addEventListener('click', handleRestartGame);
+    </script>
+</body>
+</html>
